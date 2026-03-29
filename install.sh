@@ -15,8 +15,9 @@ Usage: sudo /home/pi/pi-kiosk/install.sh [--url https://...] [--no-apt]
   --url URL     Write /home/pi/kiosk_url.txt (required if that file has no URL yet)
   --no-apt      Skip apt-get install (faster repeat runs after git pull)
 
-Installs systemd units, Labwc autostart snippet, nightly kiosk restart cron,
-and ensures repo scripts are executable. Re-run after every git pull.
+Installs systemd units, Labwc autostart snippet, Plymouth branded boot theme,
+nightly kiosk restart cron, and ensures repo scripts are executable.
+Re-run after every git pull.
 U
 }
 
@@ -78,7 +79,8 @@ if [[ "$SKIP_APT" -eq 0 ]]; then
     chromium-browser \
     wlr-randr \
     v4l-utils \
-    || apt-get install -y python3-flask chromium wlr-randr v4l-utils
+    plymouth \
+    || apt-get install -y python3-flask chromium wlr-randr v4l-utils plymouth
 fi
 
 chown -R "${PI_USER}:${PI_USER}" "$REPO"
@@ -147,6 +149,67 @@ merge_pi_user_labwc_autostart() {
 merge_labwc_autostart
 merge_pi_user_labwc_autostart
 
+merge_pi_boot_cmdline() {
+  local f=""
+  for cand in /boot/firmware/cmdline.txt /boot/cmdline.txt; do
+    [[ -f "$cand" ]] && f="$cand" && break
+  done
+  [[ -n "$f" ]] || return 0
+  local line filtered=()
+  line="$(tr -s '[:space:]' ' ' <"$f" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+  read -r -a _toks <<<"$line"
+  local t
+  for t in "${_toks[@]}"; do
+    [[ "$t" == "nosplash" ]] && continue
+    filtered+=("$t")
+  done
+  line="${filtered[*]}"
+  local tok
+  for tok in splash quiet logo.nologo plymouth.ignore-serial-consoles; do
+    if [[ " $line " != *" $tok "* ]]; then
+      line="${line} ${tok}"
+    fi
+  done
+  printf '%s\n' "$line" >"${f}.new"
+  mv "${f}.new" "$f"
+}
+
+merge_pi_config_disable_firmware_splash() {
+  local f=""
+  for cand in /boot/firmware/config.txt /boot/config.txt; do
+    [[ -f "$cand" ]] && f="$cand" && break
+  done
+  [[ -n "$f" ]] || return 0
+  if grep -q '^[[:space:]]*disable_splash=' "$f"; then
+    sed -i 's/^[[:space:]]*disable_splash=.*/disable_splash=1/' "$f"
+  else
+    printf '\n# pi-kiosk: suppress firmware rainbow splash\ndisable_splash=1\n' >>"$f"
+  fi
+}
+
+install_plymouth_brand_theme() {
+  local themed="/usr/share/plymouth/themes/pi-kiosk-brand"
+  local src="${REPO}/plymouth/pi-kiosk-brand"
+  local splash_src="${REPO}/assets/boot-splash-1080p.png"
+  [[ -f "${src}/pi-kiosk-brand.script" ]] || return 0
+  [[ -f "$splash_src" ]] || {
+    echo "Skipping Plymouth theme: missing $splash_src" >&2
+    return 0
+  }
+  if ! command -v plymouth-set-default-theme >/dev/null 2>&1; then
+    echo "Skipping Plymouth theme: install plymouth (re-run without --no-apt)." >&2
+    return 0
+  fi
+  install -d "$themed"
+  install -m 0644 "${src}/pi-kiosk-brand.plymouth" "${src}/pi-kiosk-brand.script" "$themed/"
+  install -m 0644 "$splash_src" "${themed}/splash.png"
+  plymouth-set-default-theme -R pi-kiosk-brand
+}
+
+merge_pi_boot_cmdline
+merge_pi_config_disable_firmware_splash
+install_plymouth_brand_theme
+
 install -m 0644 "${REPO}/config/cron-pi-kiosk-restart" /etc/cron.d/pi-kiosk-restart
 
 systemctl daemon-reload
@@ -163,4 +226,4 @@ systemctl restart pi-kiosk-health.timer
 
 systemctl enable pi-tv-on-early.service
 
-echo "Install finished. If this was the first Labwc autostart change, reboot the Pi."
+echo "Install finished. Reboot the Pi to apply Plymouth, cmdline, and Labwc autostart changes."

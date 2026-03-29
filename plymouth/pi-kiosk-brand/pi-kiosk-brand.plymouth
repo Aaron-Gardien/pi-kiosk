@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Pi Kiosk Brand
+Description=Branded boot splash (no Raspberry Pi logo)
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/pi-kiosk-brand
+ScriptFile=pi-kiosk-brand.script

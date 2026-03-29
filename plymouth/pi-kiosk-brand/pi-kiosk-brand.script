@@ -1,0 +1,37 @@
+# Full-screen centred splash (assets/boot-splash-1080p.png installed as splash.png)
+
+Window.SetBackgroundTopColor(0, 0, 0);
+Window.SetBackgroundBottomColor(0, 0, 0);
+
+background_image = Image("splash.png");
+screen_ratio = Window.GetHeight() / Window.GetWidth();
+background_image_ratio = background_image.GetHeight() / background_image.GetWidth();
+
+if (screen_ratio > background_image_ratio)
+ {
+ scale_factor = Window.GetHeight() / background_image.GetHeight();
+ }
+else
+ {
+ scale_factor = Window.GetWidth() / background_image.GetWidth();
+ }
+
+scaled = background_image.Scale(
+  background_image.GetWidth() * scale_factor,
+  background_image.GetHeight() * scale_factor);
+background_sprite = Sprite(scaled);
+background_sprite.SetX(Window.GetWidth() / 2 - scaled.GetWidth() / 2);
+background_sprite.SetY(Window.GetHeight() / 2 - scaled.GetHeight() / 2);
+background_sprite.SetZ(-10000);
+
+fun refresh_callback ()
+ {
+ }
+
+Plymouth.SetRefreshFunction (refresh_callback);
+
+fun quit_callback ()
+ {
+ }
+
+Plymouth.SetQuitFunction (quit_callback);
