@@ -19,7 +19,7 @@ Wayland kiosk (Chromium + Labwc) for Raspberry Pi with a small Flask **admin UI*
 
    ```bash
    cd /home/pi
-   git clone git@github.com:aaron-gardien/pi-kiosk.git pi-kiosk
+   git clone https://github.com/aaron-gardien/pi-kiosk.git
    cd pi-kiosk
    sudo ./install.sh --url "https://www.google.com/"
    sudo reboot
