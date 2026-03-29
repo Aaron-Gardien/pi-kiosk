@@ -90,6 +90,16 @@ for unit in "${REPO}/systemd"/*.service "${REPO}/systemd"/*.timer; do
   install -m 0644 "$unit" "/etc/systemd/system/$(basename "$unit")"
 done
 
+strip_pi_desktop_autostart_lines() {
+  local in="$1"
+  local out="$2"
+  sed \
+    -e '/wf-panel-pi/d' \
+    -e '/pcmanfm-pi/d' \
+    -e '/lxsession-xdg-autostart/d' \
+    "$in" >"$out"
+}
+
 merge_labwc_autostart() {
   local f="/etc/xdg/labwc/autostart"
   local tmp
@@ -109,6 +119,9 @@ merge_labwc_autostart() {
   else
     : >"$tmp"
   fi
+  # Kiosk: no Pi panel / file manager / XDG autostart until admin "Show Pi desktop".
+  strip_pi_desktop_autostart_lines "$tmp" "${tmp}.strip"
+  mv "${tmp}.strip" "$tmp"
   cat >>"$tmp" <<'LABEOF'
 
 # BEGIN PI-KIOSK-DEPLOY
@@ -120,7 +133,19 @@ LABEOF
   rm -f "$tmp"
 }
 
+merge_pi_user_labwc_autostart() {
+  local f="${PI_HOME}/.config/labwc/autostart"
+  [[ -f "$f" ]] || return 0
+  local tmp
+  tmp="$(mktemp)"
+  strip_pi_desktop_autostart_lines "$f" "$tmp"
+  install -m 0644 "$tmp" "$f"
+  rm -f "$tmp"
+  chown "${PI_USER}:${PI_USER}" "$f"
+}
+
 merge_labwc_autostart
+merge_pi_user_labwc_autostart
 
 install -m 0644 "${REPO}/config/cron-pi-kiosk-restart" /etc/cron.d/pi-kiosk-restart
 
