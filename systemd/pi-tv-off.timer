@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily TV off schedule
+
+[Timer]
+OnCalendar=*-*-* 18:00:00
+Persistent=true
+Unit=pi-tv-off.service
+
+[Install]
+WantedBy=timers.target

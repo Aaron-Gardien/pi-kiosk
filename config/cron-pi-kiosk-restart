@@ -1,0 +1,5 @@
+# Nightly kiosk restart to keep long-running pages healthy.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+0 3 * * * pi NO_TV_ON=1 /home/pi/pi-kiosk/scripts/kiosk-stop.sh && sleep 5 && NO_TV_ON=1 /home/pi/pi-kiosk/scripts/kiosk-start.sh

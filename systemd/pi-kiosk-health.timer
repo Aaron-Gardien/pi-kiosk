@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Pi kiosk health check
+
+[Timer]
+OnCalendar=*-*-* 08:00:00
+Persistent=true
+Unit=pi-kiosk-health.service
+
+[Install]
+WantedBy=timers.target

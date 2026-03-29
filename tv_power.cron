@@ -1,0 +1,9 @@
+# Example cron entries for TV power control.
+# Install with: crontab /home/pi/tv_power.cron
+
+# Turn TV ON at 07:30
+30 7 * * * /home/pi/tv_on.sh
+
+# Turn TV OFF at 23:51
+51 23 * * * /home/pi/tv_off.sh
+

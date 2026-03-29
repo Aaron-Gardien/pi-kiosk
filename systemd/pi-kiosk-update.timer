@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodic pi-kiosk update from git
+
+[Timer]
+OnCalendar=*-*-* 04:15:00
+RandomizedDelaySec=45m
+Persistent=true
+Unit=pi-kiosk-update.service
+
+[Install]
+WantedBy=timers.target

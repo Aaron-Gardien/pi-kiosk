@@ -1,0 +1,14 @@
+[Unit]
+Description=Power on TV via HDMI-CEC at boot
+DefaultDependencies=no
+After=local-fs.target systemd-udevd.service
+Before=lightdm.service display-manager.service graphical.target
+Wants=lightdm.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/pi/pi-kiosk/scripts/tv_on_early.sh
+TimeoutStartSec=90
+
+[Install]
+WantedBy=multi-user.target

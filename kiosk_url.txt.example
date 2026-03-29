@@ -1,0 +1,2 @@
+# First non-comment line in /home/pi/kiosk_url.txt is the kiosk page (http or https).
+# Copy to kiosk_url.txt or use: sudo ./install.sh --url 'https://example.com/'

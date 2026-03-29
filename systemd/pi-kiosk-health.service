@@ -1,0 +1,6 @@
+[Unit]
+Description=Pi kiosk health check
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -lc '/home/pi/pi-kiosk/scripts/health_check.sh >> /home/pi/pi-kiosk/logs/health_check.log 2>&1'

@@ -1,0 +1,9 @@
+[Unit]
+Description=Git pull and re-run pi-kiosk install
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+Group=pi
+ExecStart=/home/pi/pi-kiosk/scripts/git_update_install.sh

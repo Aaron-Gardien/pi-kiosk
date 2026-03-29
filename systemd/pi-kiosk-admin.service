@@ -1,0 +1,16 @@
+[Unit]
+Description=Pi kiosk admin web server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/pi/pi-kiosk
+Environment=KIOSK_ADMIN_HOST=0.0.0.0
+Environment=KIOSK_ADMIN_PORT=8088
+ExecStart=/usr/bin/python3 /home/pi/pi-kiosk/admin_server.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

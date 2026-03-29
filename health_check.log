@@ -1,0 +1,180 @@
+=== pi-kiosk health check @ 2026-03-26T23:56:15+10:00 ===
+
+-- Kiosk processes --
+1404 /usr/bin/labwc -m
+1454 /usr/bin/ssh-agent /usr/bin/labwc-pi
+1313 /usr/bin/rpi-connectd -socket /run/user/1000/rpi-connect-wayvnc.sock
+1665 /usr/bin/wayvnc --config /etc/rpi-connect/wayvnc.config --render-cursor --unix-socket --socket=/run/user/1000/rpi-connect-wayvnc-ctl.sock /run/user/1000/rpi-connect-wayvnc.sock
+1509 /bin/bash /home/pi/kiosk_wayland.sh
+1518 /usr/lib/chromium/chromium --js-flags=--no-decommit-pooled-pages --force-renderer-accessibility --enable-remote-extensions --show-component-extension-options --enable-gpu-rasterization --no-default-browser-check --disable-pings --media-router=0 --disable-dev-shm-usage --enable-remote-extensions --load-extension --use-angle=gles --ozone-platform=wayland --enable-features=UseOzonePlatform --no-first-run --noerrdialogs --disable-infobars --kiosk --password-store=basic --use-mock-keychain --user-data-dir=/home/pi/.config/chromium-kiosk --disable-features=PasswordManager --disable-session-crashed-bubble --check-for-update-interval=31536000 --autoplay-policy=no-user-gesture-required --disk-cache-size=10000000 file:///home/pi/Documents/pi-kiosk/loading.html#https://avbooth.com.au
+
+-- TV timers --
+● pi-tv-on.timer - Daily TV on schedule
+     Loaded: loaded (/etc/systemd/system/pi-tv-on.timer; enabled; preset: enabled)
+     Active: active (waiting) since Thu 2026-03-26 23:53:00 AEST; 3min 15s ago
+ Invocation: 8809bdd1faf24c6ea78f47c664790573
+    Trigger: Fri 2026-03-27 07:30:00 AEST; 7h left
+   Triggers: ● pi-tv-on.service
+
+Mar 26 23:53:00 pi-videowall-1 systemd[1]: Started pi-tv-on.timer - Daily TV on schedule.
+
+● pi-tv-off.timer - Daily TV off schedule
+     Loaded: loaded (/etc/systemd/system/pi-tv-off.timer; enabled; preset: enabled)
+     Active: active (waiting) since Thu 2026-03-26 23:53:00 AEST; 3min 15s ago
+ Invocation: b4cf527ae7bf4beca93e8307d794571d
+    Trigger: Fri 2026-03-27 23:51:00 AEST; 23h left
+   Triggers: ● pi-tv-off.service
+
+Mar 26 23:53:00 pi-videowall-1 systemd[1]: Started pi-tv-off.timer - Daily TV off schedule.
+
+-- Last TV on/off results --
+Result=success
+ExecMainExitTimestamp=
+ExecMainStatus=0
+ActiveState=inactive
+Result=success
+ExecMainExitTimestamp=
+ExecMainStatus=0
+ActiveState=inactive
+
+-- Next triggers --
+NEXT                             LEFT LAST                         PASSED UNIT                         ACTIVATES
+
+=== Pi Kiosk Health Check ===
+Fri 27 Mar 11:03:46 AEST 2026
+
+Host: pi-videowall-1
+IP: 192.168.1.116
+
+--- Kiosk process ---
+Kiosk chromium: RUNNING
+1186 /usr/lib/chromium/chromium --js-flags=--no-decommit-pooled-pages --force-renderer-accessibility --enable-remote-extensions --show-component-extension-options --enable-gpu-rasterization --no-default-browser-check --disable-pings --media-router=0 --disable-dev-shm-usage --enable-remote-extensions --load-extension --use-angle=gles --ozone-platform=wayland --enable-features=UseOzonePlatform --no-first-run --noerrdialogs --disable-infobars --kiosk --password-store=basic --use-mock-keychain --user-data-dir=/home/pi/.config/chromium-kiosk --disable-features=PasswordManager --disable-session-crashed-bubble --check-for-update-interval=31536000 --autoplay-policy=no-user-gesture-required --disk-cache-size=10000000 file:///home/pi/Documents/pi-kiosk/loading.html#target=https%3A//www.flightradar24.com/-37.79%2C144.97/6&host=pi-videowall-1&ips=
+
+--- Disable flag ---
+/tmp/kiosk.disabled is not present
+
+--- TV timers ---
+● pi-tv-on.timer - Daily TV on schedule
+     Loaded: loaded (/etc/systemd/system/pi-tv-on.timer; enabled; preset: enabled)
+     Active: active (waiting) since Fri 2026-03-27 01:23:07 AEST; 9h ago
+ Invocation: 6eee29e02ead405f950a6d36590e196e
+    Trigger: Sat 2026-03-28 00:55:00 AEST; 13h left
+   Triggers: ● pi-tv-on.service
+
+Mar 27 01:23:07 pi-videowall-1 systemd[1]: Started pi-tv-on.timer - Daily TV on schedule.
+
+● pi-tv-off.timer - Daily TV off schedule
+     Loaded: loaded (/etc/systemd/system/pi-tv-off.timer; enabled; preset: enabled)
+     Active: active (waiting) since Fri 2026-03-27 01:23:07 AEST; 9h ago
+ Invocation: 383df750b21c49ce97b6c1d0d0c74b36
+    Trigger: Sat 2026-03-28 01:24:00 AEST; 14h left
+   Triggers: ● pi-tv-off.service
+
+Mar 27 01:23:07 pi-videowall-1 systemd[1]: Started pi-tv-off.timer - Daily TV off schedule.
+
+--- Last TV ON service logs ---
+-- No entries --
+
+--- Last TV OFF service logs ---
+Mar 27 01:24:06 pi-videowall-1 tv_off.sh[2174]:             RC TV Profile          : None
+Mar 27 01:24:06 pi-videowall-1 tv_off.sh[2174]:             Device Features        :
+Mar 27 01:24:06 pi-videowall-1 tv_off.sh[2174]:                 None
+Mar 27 01:24:06 pi-videowall-1 tv_off.sh[2174]: Transmit from Playback Device 1 to TV (4 to 0):
+Mar 27 01:24:06 pi-videowall-1 tv_off.sh[2174]: STANDBY (0x36)
+Mar 27 01:24:06 pi-videowall-1 tv_off.sh[2174]:         Sequence: 17 Tx Timestamp: 64.528962s
+Mar 27 01:24:06 pi-videowall-1 systemd[1]: pi-tv-off.service: Deactivated successfully.
+Mar 27 01:24:06 pi-videowall-1 systemd[1]: Finished pi-tv-off.service - Turn TV off via HDMI-CEC.
+
+--- Admin service ---
+● pi-kiosk-admin.service - Pi kiosk admin web server
+     Loaded: loaded (/etc/systemd/system/pi-kiosk-admin.service; enabled; preset: enabled)
+     Active: active (running) since Fri 2026-03-27 01:23:08 AEST; 9h ago
+ Invocation: fbddc5a3d6a74e41876fd282abebaed5
+   Main PID: 973 (python3)
+      Tasks: 1 (limit: 4759)
+        CPU: 6.334s
+     CGroup: /system.slice/pi-kiosk-admin.service
+             └─973 /usr/bin/python3 /home/pi/Documents/pi-kiosk/admin_server.py
+
+Mar 27 01:28:26 pi-videowall-1 python3[973]: 127.0.0.1 - - [27/Mar/2026 01:28:26] "GET /device-info HTTP/1.1" 200 -
+Mar 27 01:28:27 pi-videowall-1 python3[973]: 127.0.0.1 - - [27/Mar/2026 01:28:27] "GET /device-info HTTP/1.1" 200 -
+Mar 27 01:28:28 pi-videowall-1 python3[973]: 127.0.0.1 - - [27/Mar/2026 01:28:28] "GET /device-info HTTP/1.1" 200 -
+Mar 27 01:28:29 pi-videowall-1 python3[973]: 127.0.0.1 - - [27/Mar/2026 01:28:29] "GET /device-info HTTP/1.1" 200 -
+Mar 27 01:28:30 pi-videowall-1 python3[973]: 127.0.0.1 - - [27/Mar/2026 01:28:30] "GET /device-info HTTP/1.1" 200 -
+Mar 27 01:28:31 pi-videowall-1 python3[973]: 127.0.0.1 - - [27/Mar/2026 01:28:31] "GET /device-info HTTP/1.1" 200 -
+Mar 27 01:28:32 pi-videowall-1 python3[973]: 127.0.0.1 - - [27/Mar/2026 01:28:32] "GET /device-info HTTP/1.1" 200 -
+Mar 27 01:28:33 pi-videowall-1 python3[973]: 127.0.0.1 - - [27/Mar/2026 01:28:33] "GET /device-info HTTP/1.1" 200 -
+Mar 27 01:28:34 pi-videowall-1 python3[973]: 127.0.0.1 - - [27/Mar/2026 01:28:34] "GET /device-info HTTP/1.1" 200 -
+Mar 27 01:28:35 pi-videowall-1 python3[973]: 127.0.0.1 - - [27/Mar/2026 01:28:35] "GET /device-info HTTP/1.1" 200 -
+=== Pi Kiosk Health Check ===
+Sun 29 Mar 18:27:35 AEST 2026
+
+Host: pi-videowall-1
+IP: 192.168.102.119 fd49:e83c:fb23:4114:e303:12b1:7510:b343
+
+--- Kiosk process ---
+Kiosk chromium: RUNNING
+1199 /usr/lib/chromium/chromium --js-flags=--no-decommit-pooled-pages --force-renderer-accessibility --enable-remote-extensions --show-component-extension-options --enable-gpu-rasterization --no-default-browser-check --disable-pings --media-router=0 --disable-dev-shm-usage --enable-remote-extensions --load-extension --use-angle=gles --ozone-platform=wayland --enable-features=UseOzonePlatform --no-first-run --noerrdialogs --disable-infobars --kiosk --password-store=basic --use-mock-keychain --user-data-dir=/home/pi/.config/chromium-kiosk --disable-features=PasswordManager --disable-session-crashed-bubble --check-for-update-interval=31536000 --autoplay-policy=no-user-gesture-required --disk-cache-size=10000000 file:///home/pi/Documents/pi-kiosk/loading.html#target=https%3A//dynamicexcavations.com.au&host=pi-videowall-1&ips=192.168.102.119
+
+--- Disable flag ---
+/tmp/kiosk.disabled is not present
+
+--- TV timers ---
+● pi-tv-on.timer - Daily TV on schedule
+     Loaded: loaded (/etc/systemd/system/pi-tv-on.timer; enabled; preset: enabled)
+     Active: active (running) since Fri 2026-03-27 11:21:58 AEST; 2 days ago
+ Invocation: 17918e63c1e547f08bfbdebf8c470b48
+    Trigger: n/a
+   Triggers: ● pi-tv-on.service
+
+Mar 27 11:21:58 pi-videowall-1 systemd[1]: Started pi-tv-on.timer - Daily TV on schedule.
+
+● pi-tv-off.timer - Daily TV off schedule
+     Loaded: loaded (/etc/systemd/system/pi-tv-off.timer; enabled; preset: enabled)
+     Active: active (waiting) since Fri 2026-03-27 11:21:58 AEST; 2 days ago
+ Invocation: 9b88096947314e1092c538933da9e3c7
+    Trigger: Mon 2026-03-30 11:13:00 AEST; 16h left
+   Triggers: ● pi-tv-off.service
+
+Mar 27 11:21:58 pi-videowall-1 systemd[1]: Started pi-tv-off.timer - Daily TV off schedule.
+
+--- Last TV ON service logs ---
+Mar 29 18:27:35 pi-videowall-1 tv_on.sh[1450]:         Logical Addresses          : 1 (Allow RC Passthrough)
+Mar 29 18:27:35 pi-videowall-1 tv_on.sh[1450]:           Logical Address          : Not Allocated
+Mar 29 18:27:35 pi-videowall-1 tv_on.sh[1450]:             Primary Device Type    : Playback
+Mar 29 18:27:35 pi-videowall-1 tv_on.sh[1450]:             Logical Address Type   : Playback
+Mar 29 18:27:35 pi-videowall-1 tv_on.sh[1450]:             All Device Types       : Playback
+Mar 29 18:27:35 pi-videowall-1 tv_on.sh[1450]:             RC TV Profile          : None
+Mar 29 18:27:35 pi-videowall-1 tv_on.sh[1450]:             Device Features        :
+Mar 29 18:27:35 pi-videowall-1 tv_on.sh[1450]:                 None
+
+--- Last TV OFF service logs ---
+Mar 29 18:27:35 pi-videowall-1 tv_off.sh[1443]:             All Device Types       : Playback
+Mar 29 18:27:35 pi-videowall-1 tv_off.sh[1443]:             RC TV Profile          : None
+Mar 29 18:27:35 pi-videowall-1 tv_off.sh[1443]:             Device Features        :
+Mar 29 18:27:35 pi-videowall-1 tv_off.sh[1443]:                 None
+Mar 29 18:27:35 pi-videowall-1 tv_off.sh[1443]: Transmit from Unregistered to TV (15 to 0):
+Mar 29 18:27:35 pi-videowall-1 tv_off.sh[1443]: STANDBY (0x36)
+Mar 29 18:27:35 pi-videowall-1 systemd[1]: pi-tv-off.service: Deactivated successfully.
+Mar 29 18:27:35 pi-videowall-1 systemd[1]: Finished pi-tv-off.service - Turn TV off via HDMI-CEC.
+
+--- Admin service ---
+● pi-kiosk-admin.service - Pi kiosk admin web server
+     Loaded: loaded (/etc/systemd/system/pi-kiosk-admin.service; enabled; preset: enabled)
+     Active: active (running) since Fri 2026-03-27 11:21:59 AEST; 2 days ago
+ Invocation: 6029561427f44783b1757b86e2c87a1e
+   Main PID: 964 (python3)
+      Tasks: 1 (limit: 4759)
+        CPU: 280ms
+     CGroup: /system.slice/pi-kiosk-admin.service
+             └─964 /usr/bin/python3 /home/pi/Documents/pi-kiosk/admin_server.py
+
+Mar 27 11:21:59 pi-videowall-1 systemd[1]: Started pi-kiosk-admin.service - Pi kiosk admin web server.
+Mar 27 11:22:00 pi-videowall-1 python3[964]:  * Serving Flask app 'admin_server'
+Mar 27 11:22:00 pi-videowall-1 python3[964]:  * Debug mode: off
+Mar 27 11:22:00 pi-videowall-1 python3[964]: WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+Mar 27 11:22:00 pi-videowall-1 python3[964]:  * Running on all addresses (0.0.0.0)
+Mar 27 11:22:00 pi-videowall-1 python3[964]:  * Running on http://127.0.0.1:8088
+Mar 27 11:22:00 pi-videowall-1 python3[964]:  * Running on http://127.0.0.1:8088
+Mar 27 11:22:00 pi-videowall-1 python3[964]: Press CTRL+C to quit
+Mar 27 11:22:07 pi-videowall-1 python3[964]: 127.0.0.1 - - [27/Mar/2026 11:22:07] "GET /device-info HTTP/1.1" 200 -

@@ -1,0 +1,10 @@
+[Unit]
+Description=Turn TV on via HDMI-CEC
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+Group=pi
+ExecStart=/home/pi/pi-kiosk/scripts/tv_on.sh
+TimeoutStartSec=60

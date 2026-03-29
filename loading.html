@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Starting...</title>
+    <style>
+      html, body { height: 100%; margin: 0; background: #000; color: #fff; }
+      body { display: grid; place-items: center; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
+      .wrap { text-align: center; max-width: 70ch; padding: 40px; }
+      .title { font-size: 48px; letter-spacing: 0.02em; margin: 0 0 10px; }
+      .sub { font-size: 18px; opacity: 0.85; margin: 0; }
+      .hint { font-size: 14px; opacity: 0.6; margin: 14px 0 0; word-break: break-word; }
+      .info { margin-top: 18px; font-size: 14px; opacity: 0.78; line-height: 1.55; }
+      .info code { opacity: 0.95; }
+      .dot { animation: blink 1.2s infinite; }
+      .dot:nth-child(2) { animation-delay: 0.2s; }
+      .dot:nth-child(3) { animation-delay: 0.4s; }
+      @keyframes blink { 0%, 60%, 100% { opacity: 0.2; } 30% { opacity: 1; } }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1 class="title">Starting<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></h1>
+      <p class="sub" id="status">Preparing...</p>
+      <p class="hint" id="target"></p>
+      <div class="info">
+        <div>Hostname: <code id="host">(detecting...)</code></div>
+        <div>IP: <code id="ips">(detecting...)</code></div>
+        <div>Admin: <code id="admin">(detecting...)</code></div>
+      </div>
+    </div>
+
+    <script>
+      const statusEl = document.getElementById('status');
+      const targetEl = document.getElementById('target');
+      const hostEl = document.getElementById('host');
+      const ipsEl = document.getElementById('ips');
+      const adminEl = document.getElementById('admin');
+
+      const MIN_SHOW_MS = 3000;
+      const startedAt = Date.now();
+
+      function parseHash() {
+        const raw = (location.hash || '').replace(/^#/, '').trim();
+        if (!raw) return { target: '', host: '', ips: '' };
+        if (raw.includes('=') && raw.includes('target=')) {
+          const params = new URLSearchParams(raw);
+          return {
+            target: decodeURIComponent((params.get('target') || '').trim()),
+            host: decodeURIComponent((params.get('host') || '').trim()),
+            ips: decodeURIComponent((params.get('ips') || '').trim()),
+          };
+        }
+        return { target: decodeURIComponent(raw), host: '', ips: '' };
+      }
+
+      let { target, host, ips } = parseHash();
+      if (target) targetEl.textContent = target;
+
+      function updateDeviceInfoUI(nextHost, nextIps) {
+        if (nextHost) hostEl.textContent = nextHost;
+        if (nextIps) {
+          ipsEl.textContent = nextIps;
+          const firstIp = nextIps.split(/\s+/).filter(Boolean)[0] || '';
+          if (firstIp) adminEl.textContent = `http://${firstIp}:8088`;
+        }
+      }
+      updateDeviceInfoUI(host, ips);
+
+      async function timeout(ms) {
+        return new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
+      }
+
+      async function refreshDeviceInfoFromLocal() {
+        try {
+          const resp = await Promise.race([
+            fetch('http://127.0.0.1:8088/device-info', { cache: 'no-store' }),
+            timeout(800),
+          ]);
+          if (!resp.ok) return;
+          const data = await resp.json();
+          if (data && typeof data === 'object') {
+            updateDeviceInfoUI(String(data.hostname || ''), String(data.ips || ''));
+          }
+        } catch (_) {}
+      }
+
+      async function hasInternet() {
+        try {
+          await Promise.race([
+            fetch('https://www.gstatic.com/generate_204', { cache: 'no-store', mode: 'no-cors' }),
+            timeout(2500),
+          ]);
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+      async function ensureMinShowTime() {
+        const elapsed = Date.now() - startedAt;
+        if (elapsed < MIN_SHOW_MS) {
+          await new Promise(r => setTimeout(r, MIN_SHOW_MS - elapsed));
+        }
+      }
+
+      async function loop() {
+        if (!target) {
+          statusEl.textContent = 'Missing target URL.';
+          await refreshDeviceInfoFromLocal();
+          return;
+        }
+        let attempts = 0;
+        while (true) {
+          attempts += 1;
+          statusEl.textContent = `Waiting for network (attempt ${attempts})...`;
+          await refreshDeviceInfoFromLocal();
+          if (await hasInternet()) {
+            statusEl.textContent = 'Online. Launching...';
+            await ensureMinShowTime();
+            location.replace(target);
+            return;
+          }
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+
+      loop();
+    </script>
+  </body>
+</html>
+
