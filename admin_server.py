@@ -25,6 +25,8 @@ PI_USER = "pi"
 PI_HOME = "/home/pi"
 PI_RUNTIME_DIR = f"/run/user/{PI_UID}"
 PI_WAYLAND_DISPLAY = "wayland-0"
+PI_X11_DISPLAY = ":0"
+PI_XAUTHORITY = f"{PI_HOME}/.Xauthority"
 
 HTML = """
 <!doctype html>
@@ -228,17 +230,28 @@ def kiosk_is_running() -> bool:
 
 def _pi_env(extra: Optional[dict[str, str]] = None) -> dict[str, str]:
     env = dict(os.environ)
-    env.update(
-        {
-            "HOME": PI_HOME,
-            "USER": PI_USER,
-            "LOGNAME": PI_USER,
-            "XDG_RUNTIME_DIR": PI_RUNTIME_DIR,
-            "WAYLAND_DISPLAY": PI_WAYLAND_DISPLAY,
-            "XDG_SESSION_TYPE": "wayland",
-            "DBUS_SESSION_BUS_ADDRESS": f"unix:path={PI_RUNTIME_DIR}/bus",
-        }
-    )
+    env.update({"HOME": PI_HOME, "USER": PI_USER, "LOGNAME": PI_USER})
+
+    # Try Wayland first (Labwc), otherwise fall back to X11 (:0).
+    wayland_sock = Path(PI_RUNTIME_DIR) / PI_WAYLAND_DISPLAY
+    x11_sock = Path("/tmp/.X11-unix/X0")
+    if wayland_sock.exists():
+        env.update(
+            {
+                "XDG_RUNTIME_DIR": PI_RUNTIME_DIR,
+                "WAYLAND_DISPLAY": PI_WAYLAND_DISPLAY,
+                "XDG_SESSION_TYPE": "wayland",
+                "DBUS_SESSION_BUS_ADDRESS": f"unix:path={PI_RUNTIME_DIR}/bus",
+            }
+        )
+    elif x11_sock.exists():
+        env.update(
+            {
+                "DISPLAY": PI_X11_DISPLAY,
+                "XDG_SESSION_TYPE": "x11",
+                "XAUTHORITY": PI_XAUTHORITY,
+            }
+        )
     if extra:
         env.update(extra)
     return env

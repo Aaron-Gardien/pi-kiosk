@@ -28,6 +28,26 @@ fi
 
 enc() { python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1] if len(sys.argv)>1 else ""))' "$1"; }
 
+detect_session_type() {
+  if [[ "${XDG_SESSION_TYPE:-}" == "wayland" ]] || [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+    echo "wayland"
+    return 0
+  fi
+  if [[ "${XDG_SESSION_TYPE:-}" == "x11" ]] || [[ -n "${DISPLAY:-}" ]]; then
+    echo "x11"
+    return 0
+  fi
+  if [[ -n "${XDG_RUNTIME_DIR:-}" ]] && [[ -S "${XDG_RUNTIME_DIR}/wayland-0" ]]; then
+    echo "wayland"
+    return 0
+  fi
+  if [[ -S "/tmp/.X11-unix/X0" ]]; then
+    echo "x11"
+    return 0
+  fi
+  echo "unknown"
+}
+
 while true; do
   [[ -f "$DISABLE_FLAG" ]] && exit 0
 
@@ -35,21 +55,27 @@ while true; do
   IPS="$(hostname -I 2>/dev/null | tr -s ' ' | sed 's/[[:space:]]*$//' || true)"
   LOADING_PAGE="${LOADING_PAGE_BASE}#target=$(enc "$KIOSK_URL")&host=$(enc "$HOSTNAME")&ips=$(enc "$IPS")"
 
+  SESSION_TYPE="$(detect_session_type)"
+  CHROME_FLAGS=(
+    --no-first-run
+    --noerrdialogs
+    --disable-infobars
+    --kiosk
+    --password-store=basic
+    --use-mock-keychain
+    --user-data-dir="$PROFILE_DIR"
+    --disable-features=PasswordManager
+    --disable-session-crashed-bubble
+    --check-for-update-interval=31536000
+    --autoplay-policy=no-user-gesture-required
+    --disk-cache-size=10000000
+  )
+  if [[ "$SESSION_TYPE" == "wayland" ]]; then
+    CHROME_FLAGS+=(--ozone-platform=wayland --enable-features=UseOzonePlatform)
+  fi
+
   "$CHROMIUM_BIN" \
-    --ozone-platform=wayland \
-    --enable-features=UseOzonePlatform \
-    --no-first-run \
-    --noerrdialogs \
-    --disable-infobars \
-    --kiosk \
-    --password-store=basic \
-    --use-mock-keychain \
-    --user-data-dir="$PROFILE_DIR" \
-    --disable-features=PasswordManager \
-    --disable-session-crashed-bubble \
-    --check-for-update-interval=31536000 \
-    --autoplay-policy=no-user-gesture-required \
-    --disk-cache-size=10000000 \
+    "${CHROME_FLAGS[@]}" \
     "$LOADING_PAGE" || true
 
   sleep 2
