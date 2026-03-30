@@ -51,4 +51,10 @@ if [[ "$DO_STASH" -eq 1 ]] && { ! git diff --quiet || ! git diff --cached --quie
 fi
 
 git pull --ff-only
-sudo "$REPO/install.sh" --no-apt
+
+if [[ ! -f "$REPO/install.sh" ]]; then
+  echo "pi-kiosk: missing $REPO/install.sh after pull." >&2
+  exit 1
+fi
+
+sudo /bin/bash "$REPO/install.sh" --no-apt

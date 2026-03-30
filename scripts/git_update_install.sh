@@ -53,4 +53,9 @@ fi
 
 git pull --ff-only
 
-exec sudo /home/pi/pi-kiosk/install.sh --no-apt
+if [[ ! -f /home/pi/pi-kiosk/install.sh ]]; then
+  echo "pi-kiosk: missing /home/pi/pi-kiosk/install.sh after pull." >&2
+  exit 1
+fi
+
+exec sudo /bin/bash /home/pi/pi-kiosk/install.sh --no-apt
