@@ -14,6 +14,7 @@ Usage: sudo /home/pi/pi-kiosk/install.sh [--url https://...] [--no-apt] [videowa
 
   --url URL     Write /home/pi/kiosk_url.txt (required if that file has no URL yet)
   --no-apt      Skip apt-get install (faster repeat runs after git pull)
+  --force-x11   Switch Raspberry Pi desktop session from Wayland to X11.
 
 Installs systemd units, Labwc autostart snippet, Plymouth branded boot theme,
 nightly kiosk restart cron, and ensures repo scripts are executable.
@@ -33,6 +34,7 @@ U
 
 SKIP_APT=0
 URL=""
+FORCE_X11=0
 VIDEOWALL=0
 DESKFLOW_ROLE=""
 DESKFLOW_SERVER_ADDR=""
@@ -45,6 +47,10 @@ while [[ $# -gt 0 ]]; do
     --url)
       URL="${2:-}"
       shift 2
+      ;;
+    --force-x11|--x11)
+      FORCE_X11=1
+      shift
       ;;
     --videowall)
       VIDEOWALL=1
@@ -253,6 +259,24 @@ merge_pi_boot_cmdline
 merge_pi_config_disable_firmware_splash
 install_plymouth_brand_theme
 
+configure_pi_session_x11() {
+  [[ "$FORCE_X11" -eq 1 ]] || return 0
+
+  if command -v raspi-config >/dev/null 2>&1; then
+    if raspi-config nonint do_wayland W2 >/dev/null 2>&1; then
+      echo "Configured desktop session: X11"
+    else
+      echo "Could not switch to X11 automatically via raspi-config." >&2
+      echo "Run manually: sudo raspi-config (Advanced Options -> Wayland -> X11)" >&2
+    fi
+  else
+    echo "raspi-config not found; cannot auto-switch to X11." >&2
+    echo "Run manually in Raspberry Pi Configuration / raspi-config." >&2
+  fi
+}
+
+configure_pi_session_x11
+
 install -m 0644 "${REPO}/config/cron-pi-kiosk-restart" /etc/cron.d/pi-kiosk-restart
 
 systemctl daemon-reload
@@ -369,5 +393,36 @@ EOF
 }
 
 configure_videowall
+
+report_display_session_status() {
+  echo "Display session status:"
+
+  if command -v raspi-config >/dev/null 2>&1; then
+    local wl_mode
+    wl_mode="$(raspi-config nonint get_wayland 2>/dev/null || true)"
+    case "$wl_mode" in
+      W2) echo "  Configured desktop backend: X11" ;;
+      W1) echo "  Configured desktop backend: Wayland" ;;
+      *)  echo "  Configured desktop backend: unknown (raspi-config code: ${wl_mode:-n/a})" ;;
+    esac
+  else
+    echo "  Configured desktop backend: unknown (raspi-config not found)"
+  fi
+
+  local session_id active_type
+  session_id="$(loginctl list-sessions --no-legend 2>/dev/null | awk '$3=="pi"{print $1; exit}' || true)"
+  if [[ -n "$session_id" ]]; then
+    active_type="$(loginctl show-session "$session_id" -p Type --value 2>/dev/null || true)"
+    if [[ -n "$active_type" ]]; then
+      echo "  Active session type now: ${active_type}"
+    else
+      echo "  Active session type now: unknown"
+    fi
+  else
+    echo "  Active session type now: not detected (no logged-in pi graphical session)"
+  fi
+}
+
+report_display_session_status
 
 echo "Install finished. Reboot the Pi to apply Plymouth, cmdline, and Labwc autostart changes."

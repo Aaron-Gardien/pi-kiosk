@@ -3,6 +3,28 @@ set -euo pipefail
 REPO="/home/pi/pi-kiosk"
 cd "$REPO"
 
+DO_STASH=1
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --no-stash)
+      DO_STASH=0
+      shift
+      ;;
+    --help|-h)
+      cat <<'EOF'
+Usage: /home/pi/pi-kiosk/update.sh [--no-stash]
+
+  --no-stash   Do not auto-stash local tracked changes before pull.
+EOF
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
 if [[ ! -d .git ]]; then
   echo "pi-kiosk: not a git clone; skipping update." >&2
   exit 0
@@ -22,7 +44,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if ! git diff --quiet || ! git diff --cached --quiet; then
+if [[ "$DO_STASH" -eq 1 ]] && { ! git diff --quiet || ! git diff --cached --quiet; }; then
   git stash push -m "pi-kiosk-update-autostash" >/dev/null
   STASH_CREATED=1
   echo "pi-kiosk: stashed local changes before update."
