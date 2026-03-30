@@ -1,13 +1,13 @@
 # pi-kiosk
 
-Wayland kiosk (Chromium + Labwc) for Raspberry Pi with a small Flask **admin UI** (port **8088**), HDMI-CEC TV on/off, systemd timers, and optional git-based updates.
+X11 kiosk (Chromium + Raspberry Pi OS desktop / LXDE-pi session) with a small Flask **admin UI** (port **8088**), HDMI-CEC TV on/off, systemd timers, and optional git-based updates.
 
 ## What gets installed
 
-- **Kiosk**: Labwc autostart runs `scripts/keep_awake.sh` and `scripts/kiosk_wayland.sh` (Chromium kiosk → local `loading.html` then your URL).
+- **Kiosk**: LXDE-pi autostart (`/etc/xdg/lxsession/LXDE-pi/autostart`) runs `scripts/keep_awake.sh` and `scripts/kiosk.sh` (Chromium kiosk → local `loading.html` then your URL). Panel and desktop file manager are stripped from that file until you use admin **Show Pi desktop UI**.
 - **URL**: First non-comment line in `/home/pi/kiosk_url.txt` (not stored in git). Set with `install.sh --url` or the admin UI.
 - **Admin**: `pi-kiosk-admin.service` runs `admin_server.py` as root (needed for systemd timer edits and `runuser`).
-- **TV**: `pi-tv-on.service` / `pi-tv-off.service` call `scripts/tv_on.sh` and `scripts/tv_off.sh` (adjust CEC device in those scripts if needed). Default timers: on **07:30**, off **18:00** (change via admin or edit unit files and re-run install).
+- **TV**: `pi-tv-on.service` / `pi-tv-off.service` run `scripts/tv_on_restart_kiosk.sh` (CEC wake, switch to **HDMI 1** via active-source `1.0.0.0`, then restart Chromium) and `scripts/tv_off.sh`. `pi-tv-on-early.service` still runs `tv_on.sh` only (before the display manager). `pi-kiosk-boot-tv.service` repeats TV-on + kiosk refresh after graphical login. Override CEC device or physical address with `KIOSK_CEC_DEVICE` / `KIOSK_CEC_ACTIVE_PHYS` in the environment if needed. Default timers: on **07:30**, off **18:00** (change via admin or edit unit files and re-run install).
 - **Health**: `pi-kiosk-health.timer` runs daily; log under `logs/health_check.log`.
 - **Nightly kiosk restart**: `/etc/cron.d/pi-kiosk-restart` at **03:00** (no TV power).
 
@@ -15,7 +15,7 @@ Wayland kiosk (Chromium + Labwc) for Raspberry Pi with a small Flask **admin UI*
 
 1. Create a **private** Git repository (GitHub/GitLab/etc.) and push this tree.
 2. On each Pi, use the same **deploy key** or **SSH key** with pull access, or HTTPS with a credential helper.
-3. On a fresh Pi OS (user `pi`, Wayland desktop as shipped):
+3. On a fresh Pi OS (user `pi`, desktop environment installed):
 
    ```bash
    cd /home/pi
@@ -25,6 +25,8 @@ Wayland kiosk (Chromium + Labwc) for Raspberry Pi with a small Flask **admin UI*
    sudo ./install.sh --url "https://www.google.com/"
    sudo reboot
    ```
+
+   `install.sh` selects the **X11** desktop session via `raspi-config` when available.
 
 4. After reboot, open the admin UI from another machine: `http://<pi-ip>:8088`.
 
@@ -60,9 +62,11 @@ That runs `git pull --ff-only` and `sudo ./install.sh --no-apt` so systemd units
 
 The service runs `scripts/git_update_install.sh` as `pi` (git pull + `sudo install.sh --no-apt`).
 
-## Migrating from `/home/pi/Documents/pi-kiosk`
+## Migrating from `/home/pi/Documents/pi-kiosk` or Wayland / Labwc
 
-Run `sudo ./install.sh --no-apt` after cloning to `/home/pi/pi-kiosk`. The installer removes old Labwc lines that pointed at `Documents/pi-kiosk` or `/home/pi/kiosk_wayland.sh` and inserts the managed block. Copy any existing `/home/pi/kiosk_url.txt` or pass `--url`.
+Run `sudo ./install.sh --no-apt` after cloning to `/home/pi/pi-kiosk`. The installer removes old kiosk lines (including Labwc and legacy paths), clears any **pi-kiosk** block from Labwc autostart if present, and inserts the managed block into the LXDE-pi autostart file. Copy any existing `/home/pi/kiosk_url.txt` or pass `--url`.
+
+If your image uses a nonstandard LXDE session name, adjust the path in `install.sh` (`merge_lxsession_autostart`) to match `/etc/xdg/lxsession/<profile>/autostart`.
 
 ## Layout
 
@@ -89,4 +93,3 @@ for h in pi@kiosk1 pi@kiosk2; do
   ssh "$h" "/home/pi/pi-kiosk/update.sh"
 done
 ```
-

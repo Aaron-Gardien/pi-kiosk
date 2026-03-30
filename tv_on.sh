@@ -1,5 +1,2 @@
 #!/bin/bash
-set -euo pipefail
-
-cec-ctl -d /dev/cec1 --playback --to 0 --custom-command cmd=0x04 || true
-
+exec "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/scripts/tv_on.sh"

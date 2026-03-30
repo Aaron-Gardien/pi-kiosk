@@ -1,0 +1,17 @@
+[Unit]
+Description=Wake TV (CEC HDMI 1) and restart kiosk after graphical session
+After=graphical.target
+Wants=graphical.target
+
+[Service]
+Type=oneshot
+User=pi
+Group=pi
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+ExecStart=/bin/bash -lc 'for i in $(seq 1 45); do [[ -S /tmp/.X11-unix/X0 ]] && break; sleep 1; done; sleep 3; exec /home/pi/pi-kiosk/scripts/tv_on_restart_kiosk.sh'
+TimeoutStartSec=120
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical.target

@@ -14,11 +14,10 @@ Usage: sudo /home/pi/pi-kiosk/install.sh [--url https://...] [--no-apt] [videowa
 
   --url URL     Write /home/pi/kiosk_url.txt (required if that file has no URL yet)
   --no-apt      Skip apt-get install (faster repeat runs after git pull)
-  --force-x11   Switch Raspberry Pi desktop session from Wayland to X11.
 
-Installs systemd units, Labwc autostart snippet, Plymouth branded boot theme,
-nightly kiosk restart cron, and ensures repo scripts are executable.
-Re-run after every git pull.
+Installs systemd units, LXDE-pi (X11) autostart snippet, Plymouth branded boot theme,
+nightly kiosk restart cron, and ensures repo scripts are executable. Re-run after every git pull.
+Also selects the X11 desktop session via raspi-config when available.
 
 Videowall options (optional, non-interactive):
   --videowall                 Install videowall tooling packages (deskflow, x11vnc).
@@ -34,7 +33,6 @@ U
 
 SKIP_APT=0
 URL=""
-FORCE_X11=0
 VIDEOWALL=0
 DESKFLOW_ROLE=""
 DESKFLOW_SERVER_ADDR=""
@@ -47,10 +45,6 @@ while [[ $# -gt 0 ]]; do
     --url)
       URL="${2:-}"
       shift 2
-      ;;
-    --force-x11|--x11)
-      FORCE_X11=1
-      shift
       ;;
     --videowall)
       VIDEOWALL=1
@@ -118,10 +112,10 @@ if [[ "$SKIP_APT" -eq 0 ]]; then
   apt-get install -y \
     python3-flask \
     chromium-browser \
-    wlr-randr \
+    x11-xserver-utils \
     v4l-utils \
     plymouth \
-    || apt-get install -y python3-flask chromium wlr-randr v4l-utils plymouth
+    || apt-get install -y python3-flask chromium x11-xserver-utils v4l-utils plymouth
 
   if [[ "$VIDEOWALL" -eq 1 ]]; then
     # Optional videowall tooling. These packages may not exist on every distro snapshot,
@@ -133,6 +127,7 @@ fi
 chown -R "${PI_USER}:${PI_USER}" "$REPO"
 find "${REPO}/scripts" -type f -name '*.sh' -exec chmod +x {} \;
 chmod +x "${REPO}/install.sh" "${REPO}/update.sh" 2>/dev/null || true
+chmod +x "${REPO}/kiosk_wayland.sh" "${REPO}/kiosk-start.sh" "${REPO}/kiosk-stop.sh" "${REPO}/keep_awake.sh" "${REPO}/tv_on.sh" 2>/dev/null || true
 find "${REPO}/videowall-setup" -type f -name '*.sh' -exec chmod +x {} \; 2>/dev/null || true
 find "${REPO}/videowall-setup" -type f -name '*.conf' -exec chmod 0644 {} \; 2>/dev/null || true
 
@@ -141,18 +136,58 @@ for unit in "${REPO}/systemd"/*.service "${REPO}/systemd"/*.timer; do
   install -m 0644 "$unit" "/etc/systemd/system/$(basename "$unit")"
 done
 
-strip_pi_desktop_autostart_lines() {
+strip_lxsession_desktop_lines() {
   local in="$1"
   local out="$2"
   sed \
     -e '/wf-panel-pi/d' \
+    -e '/lwrespawn/d' \
+    -e '/^[[:space:]]*@lxpanel-pi[[:space:]]*$/d' \
+    -e '/^[[:space:]]*lxpanel-pi[[:space:]]*$/d' \
+    -e '/^[[:space:]]*@lxpanel[[:space:]]/d' \
+    -e '/^[[:space:]]*@pcmanfm-pi/d' \
+    -e '/^[[:space:]]*pcmanfm-pi/d' \
+    -e '/^[[:space:]]*@pcmanfm/d' \
+    -e '/^[[:space:]]*@xscreensaver/d' \
+    -e '/^[[:space:]]*xscreensaver/d' \
     -e '/pcmanfm-pi/d' \
     -e '/lxsession-xdg-autostart/d' \
     "$in" >"$out"
 }
 
-merge_labwc_autostart() {
+cleanup_labwc_pi_kiosk_block() {
   local f="/etc/xdg/labwc/autostart"
+  [[ -f "$f" ]] || return 0
+  local tmp
+  tmp="$(mktemp)"
+  awk '
+    BEGIN { skip=0 }
+    /^# BEGIN PI-KIOSK-DEPLOY$/ { skip=1; next }
+    /^# END PI-KIOSK-DEPLOY$/ { skip=0; next }
+    skip==0 { print }
+  ' "$f" >"$tmp"
+  install -m 0644 "$tmp" "$f"
+  rm -f "$tmp"
+}
+
+cleanup_user_labwc_pi_kiosk_block() {
+  local f="${PI_HOME}/.config/labwc/autostart"
+  [[ -f "$f" ]] || return 0
+  local tmp
+  tmp="$(mktemp)"
+  awk '
+    BEGIN { skip=0 }
+    /^# BEGIN PI-KIOSK-DEPLOY$/ { skip=1; next }
+    /^# END PI-KIOSK-DEPLOY$/ { skip=0; next }
+    skip==0 { print }
+  ' "$f" >"$tmp"
+  install -m 0644 "$tmp" "$f"
+  rm -f "$tmp"
+  chown "${PI_USER}:${PI_USER}" "$f"
+}
+
+merge_lxsession_autostart() {
+  local f="/etc/xdg/lxsession/LXDE-pi/autostart"
   local tmp
   tmp="$(mktemp)"
   mkdir -p "$(dirname "$f")"
@@ -163,40 +198,31 @@ merge_labwc_autostart() {
       /^# END PI-KIOSK-DEPLOY$/ { skip=0; next }
       skip==0 { print }
     ' "$f" >"$tmp"
-    # Migrate away from old paths (one-time cleanup on each install)
     sed -e '\|/home/pi/Documents/pi-kiosk/keep_awake.sh|d' \
-        -e '\|^/home/pi/kiosk_wayland\.sh[[:space:]]*&|d' "$tmp" >"${tmp}.2"
+        -e '\|^/home/pi/kiosk_wayland\.sh|d' \
+        -e '\|^/home/pi/pi-kiosk/scripts/kiosk_wayland\.sh|d' \
+        -e '\|^/home/pi/pi-kiosk/scripts/kiosk\.sh|d' \
+        -e '\|^/home/pi/pi-kiosk/scripts/keep_awake.sh|d' "$tmp" >"${tmp}.2"
     mv "${tmp}.2" "$tmp"
   else
     : >"$tmp"
   fi
-  # Kiosk: no Pi panel / file manager / XDG autostart until admin "Show Pi desktop".
-  strip_pi_desktop_autostart_lines "$tmp" "${tmp}.strip"
+  strip_lxsession_desktop_lines "$tmp" "${tmp}.strip"
   mv "${tmp}.strip" "$tmp"
-  cat >>"$tmp" <<'LABEOF'
+  cat >>"$tmp" <<'LXEOF'
 
 # BEGIN PI-KIOSK-DEPLOY
 /home/pi/pi-kiosk/scripts/keep_awake.sh &
-/home/pi/pi-kiosk/scripts/kiosk_wayland.sh &
+/home/pi/pi-kiosk/scripts/kiosk.sh &
 # END PI-KIOSK-DEPLOY
-LABEOF
+LXEOF
   install -m 0644 "$tmp" "$f"
   rm -f "$tmp"
 }
 
-merge_pi_user_labwc_autostart() {
-  local f="${PI_HOME}/.config/labwc/autostart"
-  [[ -f "$f" ]] || return 0
-  local tmp
-  tmp="$(mktemp)"
-  strip_pi_desktop_autostart_lines "$f" "$tmp"
-  install -m 0644 "$tmp" "$f"
-  rm -f "$tmp"
-  chown "${PI_USER}:${PI_USER}" "$f"
-}
-
-merge_labwc_autostart
-merge_pi_user_labwc_autostart
+cleanup_labwc_pi_kiosk_block
+cleanup_user_labwc_pi_kiosk_block
+merge_lxsession_autostart
 
 merge_pi_boot_cmdline() {
   local f=""
@@ -260,8 +286,6 @@ merge_pi_config_disable_firmware_splash
 install_plymouth_brand_theme
 
 configure_pi_session_x11() {
-  [[ "$FORCE_X11" -eq 1 ]] || return 0
-
   if command -v raspi-config >/dev/null 2>&1; then
     if raspi-config nonint do_wayland W2 >/dev/null 2>&1; then
       echo "Configured desktop session: X11"
@@ -293,11 +317,13 @@ systemctl restart pi-kiosk-health.timer
 
 systemctl enable pi-tv-on-early.service
 
+systemctl enable pi-kiosk-boot-tv.service
+
 configure_videowall() {
   [[ "$VIDEOWALL" -eq 1 ]] || return 0
 
   # Deskflow autostart for user pi (server/client). This is a desktop UX feature and
-  # is separate from the kiosk's compositor/autostart.
+  # is separate from the kiosk LXDE autostart snippet.
   if [[ -n "$DESKFLOW_ROLE" ]]; then
     local role
     role="$(echo "$DESKFLOW_ROLE" | tr '[:upper:]' '[:lower:]' | xargs || true)"
@@ -425,4 +451,4 @@ report_display_session_status() {
 
 report_display_session_status
 
-echo "Install finished. Reboot the Pi to apply Plymouth, cmdline, and Labwc autostart changes."
+echo "Install finished. Reboot the Pi to apply Plymouth, cmdline, and LXDE-pi autostart changes."

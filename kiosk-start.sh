@@ -1,6 +1,2 @@
 #!/bin/bash
-set -euo pipefail
-
-rm -f /tmp/kiosk.disabled
-nohup /home/pi/kiosk_wayland.sh >/dev/null 2>&1 &
-
+exec "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/scripts/kiosk-start.sh"

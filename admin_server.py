@@ -13,7 +13,7 @@ from flask import Flask, Response, jsonify, redirect, render_template_string, re
 PROJECT_DIR = Path(__file__).resolve().parent
 SCRIPTS_DIR = PROJECT_DIR / "scripts"
 KIOSK_URL_FILE = Path("/home/pi/kiosk_url.txt")
-KIOSK_WAYLAND_SH = str(SCRIPTS_DIR / "kiosk_wayland.sh")
+KIOSK_SH = str(SCRIPTS_DIR / "kiosk.sh")
 KIOSK_STOP_SH = str(SCRIPTS_DIR / "kiosk-stop.sh")
 SHOW_DESKTOP_SH = str(SCRIPTS_DIR / "show_desktop.sh")
 HEALTH_CHECK_SH = str(SCRIPTS_DIR / "health_check.sh")
@@ -24,7 +24,6 @@ PI_UID = "1000"
 PI_USER = "pi"
 PI_HOME = "/home/pi"
 PI_RUNTIME_DIR = f"/run/user/{PI_UID}"
-PI_WAYLAND_DISPLAY = "wayland-0"
 PI_X11_DISPLAY = ":0"
 PI_XAUTHORITY = f"{PI_HOME}/.Xauthority"
 
@@ -217,41 +216,18 @@ def _run(cmd: list[str]) -> str:
     return p.stdout
 
 
-def kiosk_is_running() -> bool:
-    p = subprocess.run(
-        ["/bin/bash", "-lc", "pgrep -fa 'chromium.*--kiosk' >/dev/null 2>&1"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=False,
-        text=True,
-    )
-    return p.returncode == 0
-
-
 def _pi_env(extra: Optional[dict[str, str]] = None) -> dict[str, str]:
     env = dict(os.environ)
     env.update({"HOME": PI_HOME, "USER": PI_USER, "LOGNAME": PI_USER})
 
-    # Try Wayland first (Labwc), otherwise fall back to X11 (:0).
-    wayland_sock = Path(PI_RUNTIME_DIR) / PI_WAYLAND_DISPLAY
-    x11_sock = Path("/tmp/.X11-unix/X0")
-    if wayland_sock.exists():
-        env.update(
-            {
-                "XDG_RUNTIME_DIR": PI_RUNTIME_DIR,
-                "WAYLAND_DISPLAY": PI_WAYLAND_DISPLAY,
-                "XDG_SESSION_TYPE": "wayland",
-                "DBUS_SESSION_BUS_ADDRESS": f"unix:path={PI_RUNTIME_DIR}/bus",
-            }
-        )
-    elif x11_sock.exists():
-        env.update(
-            {
-                "DISPLAY": PI_X11_DISPLAY,
-                "XDG_SESSION_TYPE": "x11",
-                "XAUTHORITY": PI_XAUTHORITY,
-            }
-        )
+    env.update(
+        {
+            "DISPLAY": PI_X11_DISPLAY,
+            "XDG_SESSION_TYPE": "x11",
+            "XAUTHORITY": PI_XAUTHORITY,
+            "XDG_RUNTIME_DIR": PI_RUNTIME_DIR,
+        }
+    )
     if extra:
         env.update(extra)
     return env
@@ -384,11 +360,11 @@ def set_url():
         if not re.match(r"^https?://", url):
             raise ValueError("URL must start with http:// or https://")
         KIOSK_URL_FILE.write_text(url + "\n")
-        # Apply immediately: restart kiosk in the pi Wayland session without turning TV on.
+        # Apply immediately: restart kiosk in the pi X11 session without turning TV on.
         _run_as_pi_bash(f"{KIOSK_STOP_SH!r}")
         subprocess.run(["/bin/bash", "-lc", "rm -f /tmp/kiosk.disabled; sleep 1"], check=False)
         rc = _run_as_pi_bash(
-            f"rm -f /tmp/kiosk.disabled; NO_TV_ON=1 nohup {KIOSK_WAYLAND_SH!r} >/dev/null 2>&1 &",
+            f"rm -f /tmp/kiosk.disabled; NO_TV_ON=1 nohup {KIOSK_SH!r} >/dev/null 2>&1 &",
             extra_env={"NO_TV_ON": "1"},
         )
         if rc != 0:
@@ -416,11 +392,11 @@ def restart_kiosk():
         _run_as_pi_bash(f"{KIOSK_STOP_SH!r}")
         subprocess.run(["/bin/bash", "-lc", "rm -f /tmp/kiosk.disabled; sleep 1"], check=False)
         rc = _run_as_pi_bash(
-            f"rm -f /tmp/kiosk.disabled; NO_TV_ON=1 nohup {KIOSK_WAYLAND_SH!r} >/dev/null 2>&1 &",
+            f"rm -f /tmp/kiosk.disabled; NO_TV_ON=1 nohup {KIOSK_SH!r} >/dev/null 2>&1 &",
             extra_env={"NO_TV_ON": "1"},
         )
         if rc != 0:
-            raise RuntimeError("Failed to start kiosk in pi Wayland session.")
+            raise RuntimeError("Failed to start kiosk in pi X11 session.")
         return redirect(url_for("index", ok="Kiosk restart triggered."))
     except Exception as e:
         return redirect(url_for("index", err=str(e)))
@@ -430,9 +406,9 @@ def restart_kiosk():
 def kiosk_start():
     try:
         subprocess.run(["/bin/bash", "-lc", "rm -f /tmp/kiosk.disabled"], check=False)
-        rc = _run_as_pi_bash(f"rm -f /tmp/kiosk.disabled; nohup {KIOSK_WAYLAND_SH!r} >/dev/null 2>&1 &")
+        rc = _run_as_pi_bash(f"rm -f /tmp/kiosk.disabled; nohup {KIOSK_SH!r} >/dev/null 2>&1 &")
         if rc != 0:
-            raise RuntimeError("Failed to start kiosk in pi Wayland session.")
+            raise RuntimeError("Failed to start kiosk in pi X11 session.")
         return redirect(url_for("index", ok="Kiosk start triggered."))
     except Exception as e:
         return redirect(url_for("index", err=str(e)))
@@ -453,7 +429,7 @@ def show_desktop():
         # Requirement: showing the desktop should stop kiosk too.
         rc = _run_as_pi_bash(f"nohup {SHOW_DESKTOP_SH!r} >/dev/null 2>&1 &")
         if rc != 0:
-            raise RuntimeError("Failed to start desktop UI in pi Wayland session.")
+            raise RuntimeError("Failed to start desktop UI in pi X11 session.")
         return redirect(url_for("index", ok="Desktop UI started (kiosk stopped)."))
     except Exception as e:
         return redirect(url_for("index", err=str(e)))
@@ -475,12 +451,7 @@ def reboot():
 @app.post("/tv-on")
 def tv_on():
     try:
-        if not kiosk_is_running():
-            _run_as_pi_bash(
-                f"rm -f /tmp/kiosk.disabled; NO_TV_ON=1 nohup {KIOSK_WAYLAND_SH!r} >/dev/null 2>&1 &",
-                extra_env={"NO_TV_ON": "1"},
-            )
-            subprocess.run(["/bin/bash", "-lc", "sleep 2"], check=False)
+        # pi-tv-on.service runs CEC (wake + HDMI 1) then restarts the kiosk.
         subprocess.run(["systemctl", "start", "pi-tv-on.service"], check=False)
         return redirect(url_for("index", ok="TV ON triggered."))
     except Exception as e:

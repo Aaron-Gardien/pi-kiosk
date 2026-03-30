@@ -9,6 +9,9 @@ URL_FILE="/home/pi/kiosk_url.txt"
 PROFILE_DIR="/home/pi/.config/chromium-kiosk"
 LOADING_PAGE_BASE="file://${REPO_ROOT}/loading.html"
 
+export DISPLAY="${DISPLAY:-:0}"
+export XAUTHORITY="${XAUTHORITY:-/home/pi/.Xauthority}"
+
 [[ -f "$DISABLE_FLAG" ]] && exit 0
 
 KIOSK_URL="$(grep -v '^[[:space:]]*#' "$URL_FILE" | head -n 1 | tr -d '\r' || true)"
@@ -31,35 +34,17 @@ fi
 
 enc() { python3 -c 'import sys,urllib.parse; print(urllib.parse.quote(sys.argv[1] if len(sys.argv)>1 else ""))' "$1"; }
 
-detect_session_type() {
-  # Prefer explicit env, fall back to probing sockets.
-  if [[ "${XDG_SESSION_TYPE:-}" == "wayland" ]] || [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
-    echo "wayland"
-    return 0
-  fi
-  if [[ "${XDG_SESSION_TYPE:-}" == "x11" ]] || [[ -n "${DISPLAY:-}" ]]; then
-    echo "x11"
-    return 0
-  fi
-  if [[ -n "${XDG_RUNTIME_DIR:-}" ]] && [[ -S "${XDG_RUNTIME_DIR}/wayland-0" ]]; then
-    echo "wayland"
-    return 0
-  fi
-  if [[ -S "/tmp/.X11-unix/X0" ]]; then
-    echo "x11"
-    return 0
-  fi
-  echo "unknown"
-}
-
 while true; do
   [[ -f "$DISABLE_FLAG" ]] && exit 0
+
+  xset s off >/dev/null 2>&1 || true
+  xset -dpms >/dev/null 2>&1 || true
+  xset s noblank >/dev/null 2>&1 || true
 
   HOSTNAME="$(hostname || true)"
   IPS="$(hostname -I 2>/dev/null | tr -s ' ' | sed 's/[[:space:]]*$//' || true)"
   LOADING_PAGE="${LOADING_PAGE_BASE}#target=$(enc "$KIOSK_URL")&host=$(enc "$HOSTNAME")&ips=$(enc "$IPS")"
 
-  SESSION_TYPE="$(detect_session_type)"
   CHROME_FLAGS=(
     --no-first-run
     --noerrdialogs
@@ -74,9 +59,6 @@ while true; do
     --autoplay-policy=no-user-gesture-required
     --disk-cache-size=10000000
   )
-  if [[ "$SESSION_TYPE" == "wayland" ]]; then
-    CHROME_FLAGS+=(--ozone-platform=wayland --enable-features=UseOzonePlatform)
-  fi
 
   "$CHROMIUM_BIN" \
     "${CHROME_FLAGS[@]}" \
