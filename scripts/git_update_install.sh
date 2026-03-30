@@ -34,7 +34,7 @@ fi
 STASH_CREATED=0
 cleanup() {
   if [[ "$STASH_CREATED" -eq 1 ]]; then
-    if git stash pop --index >/dev/null 2>&1; then
+    if git stash pop >/dev/null 2>&1; then
       echo "pi-kiosk: restored local changes after update."
     else
       echo "pi-kiosk: local changes could not be auto-restored cleanly." >&2
