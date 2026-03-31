@@ -10,7 +10,13 @@ X11 kiosk (Chromium + Raspberry Pi OS desktop / LXDE-pi session) with a small Fl
 - **TV**: `pi-tv-on.service` / `pi-tv-off.service` run `scripts/tv_on_restart_kiosk.sh` (CEC wake, switch to **HDMI 1** via active-source `1.0.0.0`, then restart Chromium) and `scripts/tv_off.sh`. `pi-tv-on-early.service` still runs `tv_on.sh` only (before the display manager). `pi-kiosk-boot-tv.service` repeats TV-on + kiosk refresh after graphical login. Override CEC device or physical address with `KIOSK_CEC_DEVICE` / `KIOSK_CEC_ACTIVE_PHYS` in the environment if needed. Default timers: on **07:30**, off **18:00** (change via admin or edit unit files and re-run install).
 - **Health**: `pi-kiosk-health.timer` runs daily; log under `logs/health_check.log`.
 - **Nightly kiosk restart**: `/etc/cron.d/pi-kiosk-restart` at **03:00** (no TV power).
-- **Deskflow + x11vnc**: On every run that performs `apt` updates, `install.sh` tries to install **deskflow** and **x11vnc** (skipped if unavailable on your suite; core kiosk still installs). Deskflow **autostart** is optional: pass `--deskflow-role server` or `client` plus `--deskflow-server-addr` when `client`. **x11vnc** is enabled as a systemd service when `/etc/x11vnc/passwd` exists (create it with `videowall-setup/setup-vnc-x11vnc.sh`, then re-run install with `--no-apt`).
+- **Deskflow + x11vnc**: On every run that performs `apt` updates, `install.sh` tries to install **deskflow** and **x11vnc**. Deskflow **autostart** is optional (`--deskflow-role`). **x11vnc** is enabled when **`/etc/x11vnc/passwd.txt`** (plain text; preferred for macOS Screen Sharing) or **`/etc/x11vnc/passwd`** (`x11vnc -storepasswd`; unit uses **`-rfbauth`**) exists. The service runs as **`pi`** with **`XAUTHORITY=/home/pi/.Xauthority`** and logs to **`/home/pi/pi-kiosk/logs/x11vnc.log`**. Unattended: set **`KIOSK_VNC_PASSWORD`** (8 characters) before **`sudo ./install.sh`**. **`install.sh`** also forces LightDM **`rpd-x`** if the config still says **`rpd-labwc`**. Details: **`PI-KIOSK-AUTO-INSTALL-REFERENCE.md`**.
+
+### Why x11vnc may not be running after install
+
+1. **`install.sh --no-apt`** — Skips apt, so **`x11vnc`** may never install. Run **`sudo ./install.sh`** once without `--no-apt`, or `sudo apt-get install -y x11vnc`.
+2. **No VNC secret file** — Enable only if **`/etc/x11vnc/passwd.txt`** or **`/etc/x11vnc/passwd`** exists. Use **`videowall-setup/setup-vnc-x11vnc.sh`** or **`KIOSK_VNC_PASSWORD`** on **`install.sh`**, then **`sudo ./install.sh --no-apt`** if needed.
+3. **Wayland session** — x11vnc expects **X11 on `:0`**. Use **X11** / **`rpd-x`** (see reference); **`install.sh`** patches LightDM when it sees **`rpd-labwc`**.
 
 ## One-time setup (10+ Pis)
 

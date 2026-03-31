@@ -34,11 +34,22 @@ chmod +x setup-vnc-x11vnc.sh setup-deskflow.sh
 
 ### VNC (macOS Screen Sharing)
 
-Run:
+**Interactive** (TTY), from `videowall-setup/`:
 
 ```bash
-./setup-vnc-x11vnc.sh
+sudo ./setup-vnc-x11vnc.sh
 ```
+
+**Non-interactive** (no TTY — e.g. over SSH without `-t`, or automation): set **`KIOSK_VNC_PASSWORD`** to **exactly 8 characters** (same rule as the interactive prompt). The script reads it once, writes `/etc/x11vnc/passwd`, then **`unset`s** `KIOSK_VNC_PASSWORD` and does not echo the secret.
+
+```bash
+cd ~/pi-kiosk/videowall-setup
+sudo -E KIOSK_VNC_PASSWORD='your8chr' ./setup-vnc-x11vnc.sh
+```
+
+Avoid leaving the password in the shell history on shared systems (use a secrets mechanism or a one-off script file with `0400` perms if needed).
+
+The script writes **`/etc/x11vnc/passwd.txt`** (root:pi, `0640`) and runs **`/home/pi/pi-kiosk/install.sh --no-apt`** when the kiosk URL file exists, so **`install.sh`** installs the correct **`x11vnc.service`** (user **pi**, `-passwdfile read:...`, log under **`pi-kiosk/logs/`**).
 
 Then from macOS:
 

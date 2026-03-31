@@ -19,8 +19,11 @@ Installs systemd units, LXDE-pi (X11) autostart snippet, Plymouth branded boot t
 nightly kiosk restart cron, Deskflow + x11vnc packages, and ensures repo scripts are executable.
 Re-run after every git pull. Also selects the X11 desktop session via raspi-config when available.
 
-  x11vnc: after creating /etc/x11vnc/passwd (see videowall-setup/setup-vnc-x11vnc.sh), re-run
-          install --no-apt to install/enable the x11vnc systemd service.
+  x11vnc: install.sh enables x11vnc.service when /etc/x11vnc/passwd.txt (preferred for macOS)
+          or /etc/x11vnc/passwd (-rfbauth) exists. Unattended: export KIOSK_VNC_PASSWORD
+          (exactly 8 chars) before sudo; install creates passwd.txt then unsets it. At least
+          one apt run without --no-apt is needed so the x11vnc package is installed. See
+          PI-KIOSK-AUTO-INSTALL-REFERENCE.md.
 
 Deskflow autostart (optional; packages are always installed when apt runs):
 
@@ -293,6 +296,14 @@ configure_pi_session_x11() {
     echo "raspi-config not found; cannot auto-switch to X11." >&2
     echo "Run manually in Raspberry Pi Configuration / raspi-config." >&2
   fi
+
+  # LightDM may still default to Wayland (rpd-labwc); x11vnc needs a real X11 session on :0.
+  local lightdm="/etc/lightdm/lightdm.conf"
+  if [[ -f "$lightdm" ]] && grep -qE '^user-session=rpd-labwc$|^autologin-session=rpd-labwc$' "$lightdm" 2>/dev/null; then
+    sed -i 's/^user-session=rpd-labwc$/user-session=rpd-x/' "$lightdm"
+    sed -i 's/^autologin-session=rpd-labwc$/autologin-session=rpd-x/' "$lightdm"
+    echo "LightDM: default session set to rpd-x (X11) for kiosk + x11vnc."
+  fi
 }
 
 configure_pi_session_x11
@@ -316,6 +327,22 @@ systemctl enable pi-tv-on-early.service
 systemctl enable pi-kiosk-boot-tv.service
 
 configure_deskflow_and_vnc() {
+  # Optional unattended VNC (plain passwd file — preferred for macOS Screen Sharing; see
+  # PI-KIOSK-AUTO-INSTALL-REFERENCE.md). Clears KIOSK_VNC_PASSWORD from this shell after use.
+  if [[ -n "${KIOSK_VNC_PASSWORD:-}" ]]; then
+    if [[ ${#KIOSK_VNC_PASSWORD} -ne 8 ]]; then
+      echo "install.sh: KIOSK_VNC_PASSWORD must be exactly 8 characters; not writing /etc/x11vnc/passwd.txt." >&2
+    else
+      install -d -m 0755 /etc/x11vnc
+      printf '%s\n' "${KIOSK_VNC_PASSWORD}" > /etc/x11vnc/passwd.txt
+      chown root:pi /etc/x11vnc/passwd.txt
+      chmod 0640 /etc/x11vnc/passwd.txt
+      echo "Created /etc/x11vnc/passwd.txt for x11vnc."
+    fi
+    unset KIOSK_VNC_PASSWORD
+    export -n KIOSK_VNC_PASSWORD 2>/dev/null || true
+  fi
+
   # Deskflow autostart for user pi (server/client). This is a desktop UX feature and
   # is separate from the kiosk LXDE autostart snippet.
   if [[ -n "$DESKFLOW_ROLE" ]]; then
@@ -368,17 +395,26 @@ EOF
     esac
   fi
 
-  # x11vnc: enable system service when a password file exists (create it with
-  # videowall-setup/setup-vnc-x11vnc.sh, then re-run this installer).
-  if [[ -f /etc/x11vnc/passwd ]]; then
+  # x11vnc: working pattern from PI-KIOSK-AUTO-INSTALL-REFERENCE.md — run as pi with
+  # XAUTHORITY; passwd.txt + -passwdfile read:… for macOS; else -rfbauth for storepasswd output.
+  if [[ -f /etc/x11vnc/passwd.txt ]] || [[ -f /etc/x11vnc/passwd ]]; then
     # Disable RealVNC service-mode to avoid conflicts and macOS incompatibility.
     systemctl stop vncserver-x11-serviced 2>/dev/null || true
     systemctl disable vncserver-x11-serviced 2>/dev/null || true
 
     install -d -m 0755 /etc/x11vnc
-    chmod 600 /etc/x11vnc/passwd 2>/dev/null || true
+    install -d -m 0755 -o pi -g pi "${REPO}/logs"
+    if [[ -f /etc/x11vnc/passwd.txt ]]; then
+      chown root:pi /etc/x11vnc/passwd.txt 2>/dev/null || true
+      chmod 0640 /etc/x11vnc/passwd.txt 2>/dev/null || true
+    fi
+    if [[ -f /etc/x11vnc/passwd ]]; then
+      chown root:pi /etc/x11vnc/passwd 2>/dev/null || true
+      chmod 0640 /etc/x11vnc/passwd 2>/dev/null || true
+    fi
 
-    cat <<'EOF' >/etc/systemd/system/x11vnc.service
+    if [[ -f /etc/x11vnc/passwd.txt ]]; then
+      cat <<EOF >/etc/systemd/system/x11vnc.service
 [Unit]
 Description=x11vnc (macOS Screen Sharing compatible)
 After=graphical.target
@@ -386,28 +422,50 @@ Wants=graphical.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/x11vnc \
-  -display :0 \
-  -auth guess \
-  -rfbport 5900 \
-  -passwdfile /etc/x11vnc/passwd \
-  -forever \
-  -shared \
-  -noxdamage \
-  -repeat \
-  -o /var/log/x11vnc.log
+User=pi
+Group=pi
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+ExecStart=/usr/bin/x11vnc -display :0 -rfbport 5900 -rfbversion 3.8 -passwdfile read:/etc/x11vnc/passwd.txt -desktop RaspberryPi -forever -shared -noxdamage -repeat -cursor most -o ${REPO}/logs/x11vnc.log
 Restart=on-failure
 RestartSec=2
 
 [Install]
 WantedBy=graphical.target
 EOF
+    else
+      cat <<EOF >/etc/systemd/system/x11vnc.service
+[Unit]
+Description=x11vnc (macOS Screen Sharing compatible)
+After=graphical.target
+Wants=graphical.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+ExecStart=/usr/bin/x11vnc -display :0 -rfbport 5900 -rfbversion 3.8 -rfbauth /etc/x11vnc/passwd -desktop RaspberryPi -forever -shared -noxdamage -repeat -cursor most -o ${REPO}/logs/x11vnc.log
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical.target
+EOF
+    fi
 
     systemctl daemon-reload
     systemctl enable --now x11vnc.service
   else
-    if [[ "$SKIP_APT" -eq 0 ]] && command -v x11vnc >/dev/null 2>&1; then
-      echo "[pi-kiosk] x11vnc package is installed; add /etc/x11vnc/passwd (videowall-setup/setup-vnc-x11vnc.sh), then re-run install --no-apt to enable the service." >&2
+    if ! command -v x11vnc >/dev/null 2>&1; then
+      if [[ "$SKIP_APT" -eq 1 ]]; then
+        echo "[pi-kiosk] x11vnc is not installed: this run used --no-apt, so apt (including deskflow/x11vnc) was skipped. Run install.sh once without --no-apt, or: sudo apt-get install -y x11vnc" >&2
+      else
+        echo "[pi-kiosk] x11vnc is not installed (apt install step may have failed, or the package is unavailable)." >&2
+      fi
+    else
+      echo "[pi-kiosk] x11vnc is installed but no secret file — add /etc/x11vnc/passwd.txt (plain) or /etc/x11vnc/passwd (x11vnc -storepasswd). Use KIOSK_VNC_PASSWORD on install, videowall-setup/setup-vnc-x11vnc.sh, or PI-KIOSK-AUTO-INSTALL-REFERENCE.md; then: sudo ${REPO}/install.sh --no-apt" >&2
     fi
   fi
 }
