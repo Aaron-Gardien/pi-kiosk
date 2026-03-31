@@ -10,34 +10,34 @@ URL_FILE="${PI_HOME}/kiosk_url.txt"
 
 usage() {
   cat <<'U'
-Usage: sudo /home/pi/pi-kiosk/install.sh [--url https://...] [--no-apt] [videowall options]
+Usage: sudo /home/pi/pi-kiosk/install.sh [--url https://...] [--no-apt] [deskflow options]
 
   --url URL     Write /home/pi/kiosk_url.txt (required if that file has no URL yet)
   --no-apt      Skip apt-get install (faster repeat runs after git pull)
 
 Installs systemd units, LXDE-pi (X11) autostart snippet, Plymouth branded boot theme,
-nightly kiosk restart cron, and ensures repo scripts are executable. Re-run after every git pull.
-Also selects the X11 desktop session via raspi-config when available.
+nightly kiosk restart cron, Deskflow + x11vnc packages, and ensures repo scripts are executable.
+Re-run after every git pull. Also selects the X11 desktop session via raspi-config when available.
 
-Videowall options (optional, non-interactive):
-  --videowall                 Install videowall tooling packages (deskflow, x11vnc).
+  x11vnc: after creating /etc/x11vnc/passwd (see videowall-setup/setup-vnc-x11vnc.sh), re-run
+          install --no-apt to install/enable the x11vnc systemd service.
+
+Deskflow autostart (optional; packages are always installed when apt runs):
+
   --deskflow-role server|client
                               Configure deskflow autostart for user pi.
-  --deskflow-server-addr HOST Optional: when role=client, server hostname/IP to connect to.
-  --deskflow-server-name NAME Optional: when role=server, screen name (default: hostname).
-  --enable-x11vnc             Install/enable x11vnc system service IF /etc/x11vnc/passwd exists.
-                              (To create the password file interactively, run:
-                               /home/pi/pi-kiosk/videowall-setup/setup-vnc-x11vnc.sh)
+  --deskflow-server-addr HOST Required when role=client: server hostname or IP.
+  --deskflow-server-name NAME Optional when role=server: screen name (default: hostname).
+
+Backward-compatible no-ops: --videowall, --enable-x11vnc
 U
 }
 
 SKIP_APT=0
 URL=""
-VIDEOWALL=0
 DESKFLOW_ROLE=""
 DESKFLOW_SERVER_ADDR=""
 DESKFLOW_SERVER_NAME=""
-ENABLE_X11VNC=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --help|-h) usage; exit 0 ;;
@@ -47,7 +47,6 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --videowall)
-      VIDEOWALL=1
       shift
       ;;
     --deskflow-role)
@@ -63,7 +62,6 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --enable-x11vnc)
-      ENABLE_X11VNC=1
       shift
       ;;
     *)
@@ -117,11 +115,9 @@ if [[ "$SKIP_APT" -eq 0 ]]; then
     plymouth \
     || apt-get install -y python3-flask chromium x11-xserver-utils v4l-utils plymouth
 
-  if [[ "$VIDEOWALL" -eq 1 ]]; then
-    # Optional videowall tooling. These packages may not exist on every distro snapshot,
-    # so install failures should not break the core kiosk install.
-    apt-get install -y deskflow x11vnc || true
-  fi
+  # Deskflow (KVM) and x11vnc (remote desktop / macOS Screen Sharing). May be absent on some
+  # suites or architectures; do not fail the kiosk install if they are unavailable.
+  apt-get install -y deskflow x11vnc || true
 fi
 
 chown -R "${PI_USER}:${PI_USER}" "$REPO"
@@ -319,9 +315,7 @@ systemctl enable pi-tv-on-early.service
 
 systemctl enable pi-kiosk-boot-tv.service
 
-configure_videowall() {
-  [[ "$VIDEOWALL" -eq 1 ]] || return 0
-
+configure_deskflow_and_vnc() {
   # Deskflow autostart for user pi (server/client). This is a desktop UX feature and
   # is separate from the kiosk LXDE autostart snippet.
   if [[ -n "$DESKFLOW_ROLE" ]]; then
@@ -350,7 +344,7 @@ EOF
         ;;
       client)
         if [[ -z "$DESKFLOW_SERVER_ADDR" ]]; then
-          echo "videowall: --deskflow-role client requires --deskflow-server-addr" >&2
+          echo "install.sh: --deskflow-role client requires --deskflow-server-addr" >&2
           exit 2
         fi
         install -d -m 0755 -o pi -g pi /home/pi/.config/autostart
@@ -368,22 +362,18 @@ EOF
         chmod 0644 /home/pi/.config/autostart/org.deskflow.client.desktop
         ;;
       *)
-        echo "videowall: --deskflow-role must be server or client" >&2
+        echo "install.sh: --deskflow-role must be server or client" >&2
         exit 2
         ;;
     esac
   fi
 
-  # x11vnc: only enable when the password file already exists (avoid hanging for prompts).
-  if [[ "$ENABLE_X11VNC" -eq 1 ]]; then
+  # x11vnc: enable system service when a password file exists (create it with
+  # videowall-setup/setup-vnc-x11vnc.sh, then re-run this installer).
+  if [[ -f /etc/x11vnc/passwd ]]; then
     # Disable RealVNC service-mode to avoid conflicts and macOS incompatibility.
     systemctl stop vncserver-x11-serviced 2>/dev/null || true
     systemctl disable vncserver-x11-serviced 2>/dev/null || true
-
-    if [[ ! -f /etc/x11vnc/passwd ]]; then
-      echo "videowall: /etc/x11vnc/passwd missing; run videowall-setup/setup-vnc-x11vnc.sh first." >&2
-      return 0
-    fi
 
     install -d -m 0755 /etc/x11vnc
     chmod 600 /etc/x11vnc/passwd 2>/dev/null || true
@@ -415,10 +405,14 @@ EOF
 
     systemctl daemon-reload
     systemctl enable --now x11vnc.service
+  else
+    if [[ "$SKIP_APT" -eq 0 ]] && command -v x11vnc >/dev/null 2>&1; then
+      echo "[pi-kiosk] x11vnc package is installed; add /etc/x11vnc/passwd (videowall-setup/setup-vnc-x11vnc.sh), then re-run install --no-apt to enable the service." >&2
+    fi
   fi
 }
 
-configure_videowall
+configure_deskflow_and_vnc
 
 report_display_session_status() {
   echo "Display session status:"

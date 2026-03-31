@@ -2,6 +2,8 @@
 
 This folder contains **interactive setup scripts** for Raspberry Pi OS / Debian Trixie-based installs used in the videowall.
 
+The main **`install.sh`** already tries to install the **deskflow** and **x11vnc** packages (same as the core kiosk apt run). Use the scripts below for **VNC password/systemd** and **Deskflow role + layout** (or pass `--deskflow-role` / server opts to `install.sh` for non-interactive Deskflow autostart).
+
 ## What it sets up
 
 - **Keyboard + mouse sharing (KVM)** via **Deskflow** (Barrier-compatible)
